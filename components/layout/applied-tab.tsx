@@ -3,20 +3,20 @@
 import React from "react";
 import {
   Application,
-  CAREER_BRIDGE_JOBS,
+  JobOpening,
 } from "./types";
 
 interface AppliedTabProps {
   isSignedIn: boolean;
   appliedJobs: Application[];
-  handleModifyStatus: (jobId: string, status: Application["status"]) => void;
+  jobs: JobOpening[];
   setActiveTab: (tab: string) => void;
 }
 
 export function AppliedTab({
   isSignedIn,
   appliedJobs,
-  handleModifyStatus,
+  jobs,
   setActiveTab,
 }: AppliedTabProps) {
   return (
@@ -62,21 +62,22 @@ export function AppliedTab({
       ) : (
         <div className="grid grid-cols-1 gap-5">
           {appliedJobs.map((app) => {
-            const job = CAREER_BRIDGE_JOBS.find((j) => j.id === app.jobId);
+            const job = jobs.find((j) => j.id === app.jobId);
             if (!job) return null;
 
-            // Per-card stage logic
             const stageOrder: Record<string, number> = {
-              "Applied": 0, "Under Review": 1, "Interview Scheduled": 2, "Placed": 3, "Rejected": 2,
+              Submitted: 0,
+              Interview: 1,
+              Selected: 2,
+              Rejected: 1,
             };
             const stages = [
-              { label: "Applied"   },
-              { label: "Reviewing" },
+              { label: "Submitted" },
               { label: "Interview" },
-              { label: "Placed"    },
+              { label: "Selected" },
             ];
             const isRejected = app.status === "Rejected";
-            const activeIdx  = isRejected ? 2 : (stageOrder[app.status] ?? 0);
+            const activeIdx = stageOrder[app.status] ?? 0;
 
             return (
               <div
@@ -110,9 +111,9 @@ export function AppliedTab({
 
                   {/* Status badge top-right */}
                   <span className={`shrink-0 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border select-none ${
-                    app.status === "Placed"              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : app.status === "Interview Scheduled" ? "bg-blue-50 text-blue-700 border-blue-200"
-                    : app.status === "Rejected"           ? "bg-red-50 text-red-700 border-red-200"
+                    app.status === "Selected" ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : app.status === "Interview" ? "bg-blue-50 text-blue-700 border-blue-200"
+                    : app.status === "Rejected" ? "bg-red-50 text-red-700 border-red-200"
                     : "bg-amber-50 text-amber-700 border-amber-200"
                   }`}>{app.status}</span>
                 </div>
@@ -153,19 +154,19 @@ export function AppliedTab({
                 {/* ── Compact Stage Progress Tracker ── */}
                 <div className="relative py-1">
                   {/* Track line */}
-                  <div className="absolute top-[16px] left-[calc(12.5%+8px)] right-[calc(12.5%+8px)] h-[2px] bg-slate-100 rounded-full">
+                  <div className="absolute top-[16px] left-[calc(16.66%+8px)] right-[calc(16.66%+8px)] h-[2px] bg-slate-100 rounded-full">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${isRejected ? "bg-red-300" : "bg-[#0ca581]"}`}
-                      style={{ width: `${(activeIdx / 3) * 100}%` }}
+                      style={{ width: `${(activeIdx / 2) * 100}%` }}
                     />
                   </div>
                   {/* Stage nodes */}
-                  <div className="grid grid-cols-4 gap-1 relative z-10">
+                  <div className="grid grid-cols-3 gap-1 relative z-10">
                     {stages.map((s, idx) => {
                       const done     = idx < activeIdx;
                       const current  = idx === activeIdx;
                       const future   = idx > activeIdx;
-                      const rejected = isRejected && idx === 2;
+                      const rejected = isRejected && idx === 1;
                       return (
                         <div key={s.label} className="flex flex-col items-center gap-1.5">
                           <div className={`relative w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all duration-300
@@ -208,23 +209,11 @@ export function AppliedTab({
                 {/* ── Status message ── */}
                 <div className="bg-slate-50 rounded-2xl px-5 py-3 border border-slate-100">
                   <p className="text-xs text-slate-950 leading-relaxed font-bold">
-                    {app.status === "Placed"              ? "🎉 Congratulations! Our team will reach out with your onboarding details soon."
-                      : app.status === "Interview Scheduled" ? "📅 Your interview is scheduled. We'll contact you via WhatsApp with timing and venue details."
-                      : app.status === "Rejected"           ? "❌ Your profile was not shortlisted for this role. Don't give up — keep applying!"
-                      : "🔍 Your application is under review by our team. We'll respond within 24–48 hours."}
+                    {app.status === "Selected" ? "Congratulations! Our team will reach out with your onboarding details soon."
+                      : app.status === "Interview" ? "Your interview is in progress. We will contact you via WhatsApp with timing and venue details."
+                      : app.status === "Rejected" ? "Your profile was not shortlisted for this role. Keep applying to matching openings."
+                      : "Your application has been submitted. Our team will respond within 24-48 hours."}
                   </p>
-                </div>
-
-                {/* ── Admin controls ── */}
-                <div className="absolute bottom-6 md:bottom-8 right-6 md:right-8 flex items-center gap-1.5 select-none">
-                  <button onClick={() => handleModifyStatus(app.jobId, "Under Review")}
-                    className="text-[9px] font-bold text-amber-700 bg-amber-100/70 hover:bg-amber-100 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer border border-amber-200/50">Review</button>
-                  <button onClick={() => handleModifyStatus(app.jobId, "Interview Scheduled")}
-                    className="text-[9px] font-bold text-blue-700 bg-blue-100/70 hover:bg-blue-100 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer border border-blue-200/50">Interview</button>
-                  <button onClick={() => handleModifyStatus(app.jobId, "Placed")}
-                    className="bg-[#0ca581] hover:bg-[#0a8769] text-white text-[9px] font-bold px-2.5 py-1.5 rounded-xl transition-all shadow-sm cursor-pointer">Placed</button>
-                  <button onClick={() => handleModifyStatus(app.jobId, "Rejected")}
-                    className="text-[9px] font-bold text-red-700 bg-red-100/70 hover:bg-red-100 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer border border-red-200/50">Reject</button>
                 </div>
 
               </div>

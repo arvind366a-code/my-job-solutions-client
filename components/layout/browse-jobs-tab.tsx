@@ -2,9 +2,7 @@
 
 import React from "react";
 import {
-  Application,
   JobOpening,
-  CAREER_BRIDGE_JOBS,
   getJobCategory,
   getJobExperienceMockup,
   getJobMaxSalaryNum,
@@ -12,8 +10,7 @@ import {
 } from "./types";
 
 interface BrowseJobsTabProps {
-  isSignedIn: boolean;
-  appliedJobs: Application[];
+  jobs: JobOpening[];
   selectedJob: JobOpening | null;
   setSelectedJob: (job: JobOpening | null) => void;
   searchTerm: string;
@@ -38,8 +35,7 @@ interface BrowseJobsTabProps {
 }
 
 export function BrowseJobsTab({
-  isSignedIn,
-  appliedJobs,
+  jobs,
   selectedJob,
   setSelectedJob,
   searchTerm,
@@ -64,34 +60,34 @@ export function BrowseJobsTab({
 }: BrowseJobsTabProps) {
 
   const categoryCounts = {
-    "Commerce": CAREER_BRIDGE_JOBS.filter(j => getJobCategory(j.id) === "Commerce").length,
-    "Telecommunications": CAREER_BRIDGE_JOBS.filter(j => getJobCategory(j.id) === "Telecommunications").length,
-    "Hotels & Tourism": CAREER_BRIDGE_JOBS.filter(j => getJobCategory(j.id) === "Hotels & Tourism").length,
-    "Education": CAREER_BRIDGE_JOBS.filter(j => getJobCategory(j.id) === "Education").length,
-    "Financial Services": CAREER_BRIDGE_JOBS.filter(j => getJobCategory(j.id) === "Financial Services").length,
+    "Commerce": jobs.filter(j => getJobCategory(j.id) === "Commerce").length,
+    "Telecommunications": jobs.filter(j => getJobCategory(j.id) === "Telecommunications").length,
+    "Hotels & Tourism": jobs.filter(j => getJobCategory(j.id) === "Hotels & Tourism").length,
+    "Education": jobs.filter(j => getJobCategory(j.id) === "Education").length,
+    "Financial Services": jobs.filter(j => getJobCategory(j.id) === "Financial Services").length,
   };
 
   const jobTypeCounts = {
-    "Full time": CAREER_BRIDGE_JOBS.filter(j => j.jobType.toLowerCase() === "full time").length,
-    "Part time": CAREER_BRIDGE_JOBS.filter(j => j.jobType.toLowerCase() === "part time").length,
-    "Freelance": CAREER_BRIDGE_JOBS.filter(j => j.jobType.toLowerCase() === "freelance").length,
-    "Seasonal": CAREER_BRIDGE_JOBS.filter(j => j.jobType.toLowerCase() === "seasonal" || j.jobType.toLowerCase() === "shift based" || j.jobType.toLowerCase() === "part time").length,
+    "Full time": jobs.filter(j => j.jobType.toLowerCase() === "full time").length,
+    "Part time": jobs.filter(j => j.jobType.toLowerCase() === "part time").length,
+    "Freelance": jobs.filter(j => j.jobType.toLowerCase() === "freelance").length,
+    "Seasonal": jobs.filter(j => j.jobType.toLowerCase() === "seasonal" || j.jobType.toLowerCase() === "shift based" || j.jobType.toLowerCase() === "part time").length,
     "Fixed-Price": 0
   };
 
   const experienceCounts = {
-    "No-experience": CAREER_BRIDGE_JOBS.filter(j => getJobExperienceMockup(j.id) === "No-experience").length,
-    "Fresher": CAREER_BRIDGE_JOBS.filter(j => getJobExperienceMockup(j.id) === "Fresher").length,
-    "Intermediate": CAREER_BRIDGE_JOBS.filter(j => getJobExperienceMockup(j.id) === "Intermediate").length,
-    "Expert": CAREER_BRIDGE_JOBS.filter(j => getJobExperienceMockup(j.id) === "Expert").length,
+    "No-experience": jobs.filter(j => getJobExperienceMockup(j.id) === "No-experience").length,
+    "Fresher": jobs.filter(j => getJobExperienceMockup(j.id) === "Fresher").length,
+    "Intermediate": jobs.filter(j => getJobExperienceMockup(j.id) === "Intermediate").length,
+    "Expert": jobs.filter(j => getJobExperienceMockup(j.id) === "Expert").length,
   };
 
   const dateCounts = {
-    "All": CAREER_BRIDGE_JOBS.length,
-    "Last Hour": CAREER_BRIDGE_JOBS.filter(j => j.id !== "peon").length,
-    "Last 24 Hours": CAREER_BRIDGE_JOBS.length,
-    "Last 7 Days": CAREER_BRIDGE_JOBS.length,
-    "Last 30 Days": CAREER_BRIDGE_JOBS.length,
+    "All": jobs.length,
+    "Last Hour": jobs.filter(j => j.id !== "peon").length,
+    "Last 24 Hours": jobs.length,
+    "Last 7 Days": jobs.length,
+    "Last 30 Days": jobs.length,
   };
 
   const handleCheckboxToggle = (
@@ -196,7 +192,7 @@ export function BrowseJobsTab({
     );
   };
 
-  const filteredJobs = CAREER_BRIDGE_JOBS.filter((job) => {
+  const filteredJobs = jobs.filter((job) => {
     const matchesSearch =
       job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -241,7 +237,7 @@ export function BrowseJobsTab({
   const paginatedJobs = filteredJobs.slice((jobsPage - 1) * 6, jobsPage * 6);
 
   if (selectedJob) {
-    const relatedJobs = CAREER_BRIDGE_JOBS
+    const relatedJobs = jobs
       .filter(j => j.id !== selectedJob.id && (getJobCategory(j.id) === getJobCategory(selectedJob.id) || j.location === selectedJob.location))
       .slice(0, 3);
 

@@ -3,28 +3,21 @@
 import React from "react";
 import { UserProfile } from "./types";
 
+type ProfileFormState = Omit<UserProfile, "resumeName" | "altMobile"> & {
+  altMobile: string;
+};
+
 interface ProfileTabProps {
   userProfile: UserProfile | null;
   setActiveTab: (tab: string) => void;
-  regForm: {
-    name: string;
-    fatherName: string;
-    mobile: string;
-    altMobile: string;
-    address: string;
-    district: string;
-    aadhaarLast4: string;
-    qualification: string;
-    experience: string;
-    skills: string;
-    interestedJob: string;
-  };
-  setRegForm: (val: any) => void;
+  regForm: ProfileFormState;
+  setRegForm: React.Dispatch<React.SetStateAction<ProfileFormState>>;
   regError: string;
   regSuccess: boolean;
   handleRegistrationSubmit: (e: React.FormEvent) => void;
   regFile: File | null;
   handleFormFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  isSubmitting: boolean;
 }
 
 export function ProfileTab({
@@ -37,6 +30,7 @@ export function ProfileTab({
   handleRegistrationSubmit,
   regFile,
   handleFormFileSelect,
+  isSubmitting,
 }: ProfileTabProps) {
   if (!userProfile) {
     return (
@@ -74,6 +68,12 @@ export function ProfileTab({
                   {regError && (
                     <div className="bg-red-50 border border-red-100 text-red-600 rounded-xl p-3 text-xs font-bold">
                       ⚠️ {regError}
+                    </div>
+                  )}
+
+                  {regSuccess && (
+                    <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl p-3 text-xs font-bold">
+                      Profile saved successfully.
                     </div>
                   )}
 
@@ -189,8 +189,12 @@ export function ProfileTab({
                     </label>
                   </div>
 
-                  <button type="submit" className="w-full bg-[#0ca581] hover:bg-[#0a8769] text-white font-extrabold text-xs md:text-sm py-3.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer mt-2">
-                    Activate Profile &amp; Match Jobs
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-[#0ca581] hover:bg-[#0a8769] text-white font-extrabold text-xs md:text-sm py-3.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer mt-2 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSubmitting ? "Saving Profile..." : "Activate Profile & Match Jobs"}
                   </button>
                 </form>
 

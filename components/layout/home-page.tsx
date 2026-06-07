@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense, useCallback } from "react";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import { AppHeader } from "./app-header";
 import {
@@ -25,26 +25,26 @@ export function HomePage() {
 }
 
 function HomePageClient() {
-  // --- Client Stateful Variables ---
-  const [activeTab, setActiveTabState] = useState<string>("home");
-  // Clerk auth state (replaces mock login)
-  const { isSignedIn: clerkSignedIn } = useAuth();
+  const [activeTab, setActiveTabState] = useState<string>(() => {
+    if (typeof window === "undefined") return "home";
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get("tab");
+    return tabParam && ["home", "jobs", "applied", "about", "contact", "register", "profile"].includes(tabParam)
+      ? tabParam
+      : "home";
+  });
+  const { isLoaded, isSignedIn: clerkSignedIn } = useAuth();
   const { signOut } = useClerk();
   const isSignedIn = !!clerkSignedIn;
+  const [jobs, setJobs] = useState<JobOpening[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [appliedJobs, setAppliedJobs] = useState<Application[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobOpening | null>(null);
   const [reviewJob, setReviewJob] = useState<JobOpening | null>(null);
   const [reviewProfile, setReviewProfile] = useState<UserProfile | null>(null);
 
-  // Registered Seeker local database
-  const [registeredProfiles, setRegisteredProfiles] = useState<UserProfile[]>([]);
-
-  // Browse Jobs filtering states
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [filterLocation, setFilterLocation] = useState<string>("");
-
-  // Advanced Jobs Page Redesign filters
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([]);
   const [selectedExperienceLevels, setSelectedExperienceLevels] = useState<string[]>([]);
@@ -54,10 +54,7 @@ function HomePageClient() {
   const [jobsPage, setJobsPage] = useState<number>(1);
   const [aboutFaqOpen, setAboutFaqOpen] = useState<number | null>(0);
 
-  // Temporary Resume swap on Applying
   const [tempResumeName, setTempResumeName] = useState<string>("");
-
-  // Signup Registration Form States
   const [regForm, setRegForm] = useState({
     name: "",
     fatherName: "",
@@ -74,8 +71,9 @@ function HomePageClient() {
   const [regFile, setRegFile] = useState<File | null>(null);
   const [regError, setRegError] = useState<string>("");
   const [regSuccess, setRegSuccess] = useState<boolean>(false);
-
-  // Contact Form State
+  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
+  const [isSubmittingApplication, setIsSubmittingApplication] = useState(false);
+  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
   const [contactForm, setContactForm] = useState({
     name: "",
     mobile: "",
@@ -84,17 +82,6 @@ function HomePageClient() {
     message: "",
   });
   const [contactSuccess, setContactSuccess] = useState(false);
-
-  // Sync state with URL Query parameters (e.g. ?tab=jobs)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get("tab");
-      if (tabParam && ["home", "jobs", "applied", "about", "contact", "register", "profile"].includes(tabParam)) {
-        setActiveTabState(tabParam);
-      }
-    }
-  }, []);
 
   const setActiveTab = (tab: string) => {
     setActiveTabState(tab);
@@ -107,76 +94,107 @@ function HomePageClient() {
     }
   };
 
-  // Initialize and Sync profiles list on mount
-  useEffect(() => {
-    const cachedProfile = localStorage.getItem("cb_user_profile");
-    const cachedProfilesList = localStorage.getItem("cb_registered_profiles");
-
-    let activeProfiles: UserProfile[] = [];
-    if (cachedProfilesList) {
-      activeProfiles = JSON.parse(cachedProfilesList);
-    } else {
-      const defaultDemoProfile: UserProfile = {
-        name: "Ankit Verma",
-        fatherName: "Rajesh Verma",
-        mobile: "9876543210",
-        altMobile: "8765432109",
-        address: "12, Civil Lines, Kanpur Nagar",
-        district: "Kanpur Nagar",
-        aadhaarLast4: "4321",
-        qualification: "Graduate",
-        experience: "1–2 years",
-        skills: "Tally, Excel, Typing",
-        interestedJob: "Accountant",
-        resumeName: "ankit_verma_resume.pdf",
-      };
-      activeProfiles = [defaultDemoProfile];
-      localStorage.setItem("cb_registered_profiles", JSON.stringify(activeProfiles));
-
-      const sampleApplications: Application[] = [
-        {
-          jobId: "forward-security-director",
-          appliedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toLocaleDateString(),
-          status: "Interview Scheduled",
-          resumeName: "ankit_verma_resume.pdf",
-        }
-      ];
-      localStorage.setItem("cb_applied_jobs_9876543210", JSON.stringify(sampleApplications));
-    }
-    setRegisteredProfiles(activeProfiles);
-
-    if (cachedProfile) {
-      const parsedProfile = JSON.parse(cachedProfile) as UserProfile;
-      setUserProfile(parsedProfile);
-
-      const userApplied = localStorage.getItem(`cb_applied_jobs_${parsedProfile.mobile}`);
-      if (userApplied) {
-        setAppliedJobs(JSON.parse(userApplied));
-      } else {
-        setAppliedJobs([]);
+  const mergeJobs = useCallback((incomingJobs: JobOpening[]) => {
+    setJobs((currentJobs) => {
+      const byId = new Map(currentJobs.map((job) => [job.id, job]));
+      for (const job of incomingJobs) {
+        byId.set(job.id, job);
       }
-    }
+      return [...byId.values()];
+    });
   }, []);
 
-  // Session Handlers (registration-based seeker profile)
-  const handleSignInSession = (profile: UserProfile) => {
-    localStorage.setItem("cb_user_profile", JSON.stringify(profile));
-    setUserProfile(profile);
+  const refreshApplications = useCallback(async () => {
+    const response = await fetch("/api/applications");
+    if (!response.ok) return;
+    const data = (await response.json()) as {
+      applications?: Application[];
+      jobs?: JobOpening[];
+    };
+    setAppliedJobs(data.applications ?? []);
+    mergeJobs(data.jobs ?? []);
+  }, [mergeJobs]);
 
-    const userApplied = localStorage.getItem(`cb_applied_jobs_${profile.mobile}`);
-    if (userApplied) {
-      setAppliedJobs(JSON.parse(userApplied));
-    } else {
-      setAppliedJobs([]);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadJobs() {
+      const response = await fetch("/api/jobs");
+      if (!response.ok) return;
+      const data = (await response.json()) as { jobs?: JobOpening[] };
+      if (!cancelled) {
+        setJobs(data.jobs ?? []);
+      }
     }
-  };
+
+    void loadJobs();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      window.setTimeout(() => {
+        setUserProfile(null);
+        setAppliedJobs([]);
+      }, 0);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadUserData() {
+      const [profileResponse, applicationsResponse] = await Promise.all([
+        fetch("/api/profile"),
+        fetch("/api/applications"),
+      ]);
+
+      if (cancelled) return;
+
+      if (profileResponse.ok) {
+        const profileData = (await profileResponse.json()) as {
+          profile?: UserProfile | null;
+        };
+        setUserProfile(profileData.profile ?? null);
+        if (profileData.profile) {
+          setRegForm({
+            name: profileData.profile.name,
+            fatherName: profileData.profile.fatherName,
+            mobile: profileData.profile.mobile,
+            altMobile: profileData.profile.altMobile ?? "",
+            address: profileData.profile.address,
+            district: profileData.profile.district,
+            aadhaarLast4: profileData.profile.aadhaarLast4,
+            qualification: profileData.profile.qualification,
+            experience: profileData.profile.experience,
+            skills: profileData.profile.skills,
+            interestedJob: profileData.profile.interestedJob,
+          });
+        }
+      }
+
+      if (applicationsResponse.ok) {
+        const applicationsData = (await applicationsResponse.json()) as {
+          applications?: Application[];
+          jobs?: JobOpening[];
+        };
+        setAppliedJobs(applicationsData.applications ?? []);
+        mergeJobs(applicationsData.jobs ?? []);
+      }
+    }
+
+    void loadUserData();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, isSignedIn, mergeJobs]);
 
   const handleSignOutSession = () => {
-    localStorage.removeItem("cb_is_signed_in");
-    localStorage.removeItem("cb_user_profile");
     setUserProfile(null);
     setAppliedJobs([]);
-    signOut();
+    void signOut();
     setActiveTab("home");
   };
 
@@ -186,7 +204,6 @@ function HomePageClient() {
     }
   };
 
-  // --- Seeker Applying Submission Action ---
   const handleApplyAction = (job: JobOpening) => {
     if (!isSignedIn) {
       setRegForm({
@@ -198,53 +215,66 @@ function HomePageClient() {
       return;
     }
 
+    if (!userProfile) {
+      setRegForm((current) => ({
+        ...current,
+        interestedJob: job.title,
+      }));
+      setActiveTab("register");
+      setSelectedJob(null);
+      return;
+    }
+
     if (appliedJobs.some((a) => a.jobId === job.id)) {
       return;
     }
 
     setReviewJob(job);
-    if (userProfile) {
-      setReviewProfile({ ...userProfile });
+    setReviewProfile({ ...userProfile, interestedJob: job.title });
+  };
+
+  const submitReviewedApplication = async () => {
+    if (!reviewJob || !reviewProfile) return;
+    setIsSubmittingApplication(true);
+    setRegError("");
+
+    try {
+      const activeResume = tempResumeName || reviewProfile.resumeName || "default_resume.pdf";
+      const response = await fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roleId: reviewJob.id,
+          profile: {
+            ...reviewProfile,
+            resumeName: activeResume,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        throw new Error(data.error ?? "Unable to submit application");
+      }
+
+      setUserProfile({ ...reviewProfile, resumeName: activeResume });
+      await refreshApplications();
+      setTempResumeName("");
+      setReviewJob(null);
+      setReviewProfile(null);
+      setSelectedJob(null);
+      setActiveTab("applied");
+    } catch (error) {
+      setRegError(error instanceof Error ? error.message : "Unable to submit application");
+    } finally {
+      setIsSubmittingApplication(false);
     }
   };
 
-  const submitReviewedApplication = () => {
-    if (!reviewJob || !reviewProfile) return;
-
-    setUserProfile(reviewProfile);
-    
-    const updatedProfiles = registeredProfiles.map(p => 
-      p.mobile === reviewProfile.mobile ? reviewProfile : p
-    );
-    setRegisteredProfiles(updatedProfiles);
-    localStorage.setItem("cb_registered_profiles", JSON.stringify(updatedProfiles));
-    localStorage.setItem("cb_active_profile", JSON.stringify(reviewProfile));
-
-    const activeResume = tempResumeName || reviewProfile.resumeName || "default_resume.pdf";
-    
-    const newApplication: Application = {
-      jobId: reviewJob.id,
-      appliedAt: new Date().toLocaleDateString(),
-      status: "Under Review",
-      resumeName: activeResume,
-    };
-
-    const updated = [newApplication, ...appliedJobs];
-    setAppliedJobs(updated);
-    
-    localStorage.setItem(`cb_applied_jobs_${reviewProfile.mobile}`, JSON.stringify(updated));
-
-    setTempResumeName("");
-    setReviewJob(null);
-    setReviewProfile(null);
-    setSelectedJob(null);
-    setActiveTab("applied");
-  };
-
-  // --- Candidate Registration / Signup Submission ---
-  const handleRegistrationSubmit = (e: React.FormEvent) => {
+  const handleRegistrationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError("");
+    setIsSubmittingProfile(true);
 
     const {
       name,
@@ -272,21 +302,19 @@ function HomePageClient() {
       !interestedJob
     ) {
       setRegError("Please fill out all required fields marked with *");
+      setIsSubmittingProfile(false);
       return;
     }
 
     if (!/^\d{10}$/.test(mobile)) {
       setRegError("Mobile Number must be exactly 10 digits");
+      setIsSubmittingProfile(false);
       return;
     }
 
     if (!/^\d{4}$/.test(aadhaarLast4)) {
       setRegError("Aadhaar digits must be exactly 4 digits");
-      return;
-    }
-
-    if (registeredProfiles.some((p) => p.mobile === mobile)) {
-      setRegError("This Mobile Number is already registered! Please use a different number or contact support.");
+      setIsSubmittingProfile(false);
       return;
     }
 
@@ -295,43 +323,54 @@ function HomePageClient() {
       resumeName: regFile ? regFile.name : "my_resume.pdf",
     };
 
-    const updatedProfilesList = [...registeredProfiles, createdProfile];
-    setRegisteredProfiles(updatedProfilesList);
-    localStorage.setItem("cb_registered_profiles", JSON.stringify(updatedProfilesList));
-
-    handleSignInSession(createdProfile);
-    setRegSuccess(true);
-
-    setTimeout(() => {
-      setRegSuccess(false);
-      setRegForm({
-        name: "",
-        fatherName: "",
-        mobile: "",
-        altMobile: "",
-        address: "",
-        district: "",
-        aadhaarLast4: "",
-        qualification: "",
-        experience: "",
-        skills: "",
-        interestedJob: "",
+    try {
+      const response = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(createdProfile),
       });
+
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        throw new Error(data.error ?? "Unable to save profile");
+      }
+
+      const data = (await response.json()) as { profile?: UserProfile };
+      setUserProfile(data.profile ?? createdProfile);
+      setRegSuccess(true);
       setRegFile(null);
+      await refreshApplications();
       setActiveTab("jobs");
-    }, 2000);
+      window.setTimeout(() => setRegSuccess(false), 2500);
+    } catch (error) {
+      setRegError(error instanceof Error ? error.message : "Unable to save profile");
+    } finally {
+      setIsSubmittingProfile(false);
+    }
   };
 
-  // Inquiry message submit
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contactForm.name || !contactForm.mobile || !contactForm.message) {
       alert("Please fill out your Name, Mobile, and Message.");
       return;
     }
-    setContactSuccess(true);
-    setTimeout(() => {
-      setContactSuccess(false);
+
+    setIsSubmittingContact(true);
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contactForm),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        throw new Error(data.error ?? "Unable to send message");
+      }
+
+      setContactSuccess(true);
       setContactForm({
         name: "",
         mobile: "",
@@ -339,20 +378,11 @@ function HomePageClient() {
         location: "",
         message: "",
       });
-    }, 2500);
-  };
-
-  // Developer status modifier
-  const handleModifyStatus = (jobId: string, status: Application["status"]) => {
-    const updated = appliedJobs.map((app) => {
-      if (app.jobId === jobId) {
-        return { ...app, status };
-      }
-      return app;
-    });
-    setAppliedJobs(updated);
-    if (userProfile) {
-      localStorage.setItem(`cb_applied_jobs_${userProfile.mobile}`, JSON.stringify(updated));
+      window.setTimeout(() => setContactSuccess(false), 2500);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unable to send message");
+    } finally {
+      setIsSubmittingContact(false);
     }
   };
 
@@ -387,8 +417,7 @@ function HomePageClient() {
 
         {activeTab === "jobs" && (
           <BrowseJobsTab
-            isSignedIn={isSignedIn}
-            appliedJobs={appliedJobs}
+            jobs={jobs}
             selectedJob={selectedJob}
             setSelectedJob={setSelectedJob}
             searchTerm={searchTerm}
@@ -417,7 +446,7 @@ function HomePageClient() {
           <AppliedTab
             isSignedIn={isSignedIn}
             appliedJobs={appliedJobs}
-            handleModifyStatus={handleModifyStatus}
+            jobs={jobs}
             setActiveTab={setActiveTab}
           />
         )}
@@ -437,6 +466,7 @@ function HomePageClient() {
             handleRegistrationSubmit={handleRegistrationSubmit}
             regFile={regFile}
             handleFormFileSelect={handleFormFileSelect}
+            isSubmitting={isSubmittingProfile}
           />
         )}
 
@@ -454,6 +484,7 @@ function HomePageClient() {
             setContactForm={setContactForm}
             contactSuccess={contactSuccess}
             handleContactSubmit={handleContactSubmit}
+            isSubmitting={isSubmittingContact}
           />
         )}
       </div>
@@ -550,9 +581,10 @@ function HomePageClient() {
               </button>
               <button
                 onClick={submitReviewedApplication}
-                className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer"
+                disabled={isSubmittingApplication}
+                className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Confirm & Submit Application
+                {isSubmittingApplication ? "Submitting..." : "Confirm & Submit Application"}
               </button>
             </div>
           </div>

@@ -16,7 +16,7 @@ export interface UserProfile {
 export interface Application {
   jobId: string;
   appliedAt: string;
-  status: "Under Review" | "Interview Scheduled" | "Placed" | "Rejected";
+  status: "Submitted" | "Interview" | "Selected" | "Rejected";
   resumeName: string;
 }
 

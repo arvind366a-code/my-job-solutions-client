@@ -2,17 +2,20 @@
 
 import React from "react";
 
+type ContactFormState = {
+  name: string;
+  mobile: string;
+  email: string;
+  location: string;
+  message: string;
+};
+
 interface ContactUsTabProps {
-  contactForm: {
-    name: string;
-    mobile: string;
-    email: string;
-    location: string;
-    message: string;
-  };
-  setContactForm: (val: any) => void;
+  contactForm: ContactFormState;
+  setContactForm: React.Dispatch<React.SetStateAction<ContactFormState>>;
   contactSuccess: boolean;
   handleContactSubmit: (e: React.FormEvent) => void;
+  isSubmitting: boolean;
 }
 
 export function ContactUsTab({
@@ -20,6 +23,7 @@ export function ContactUsTab({
   setContactForm,
   contactSuccess,
   handleContactSubmit,
+  isSubmitting,
 }: ContactUsTabProps) {
   return (
     <div className="w-full bg-[#fafbfc] min-h-screen">
@@ -201,9 +205,10 @@ export function ContactUsTab({
 
                 <button
                   type="submit"
-                  className="bg-[#0ca581] hover:bg-[#0a8769] text-white font-extrabold text-xs md:text-sm py-3 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer mt-2"
+                  disabled={isSubmitting}
+                  className="bg-[#0ca581] hover:bg-[#0a8769] text-white font-extrabold text-xs md:text-sm py-3 rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer mt-2 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Send Message
+                  {isSubmitting ? "Sending..." : "Send Message"}
                 </button>
               </form>
             )}
