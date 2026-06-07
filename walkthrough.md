@@ -80,3 +80,9 @@ Route (app)             Size     First Load JS
   - *We're Only Working With The Best* collage and benefit values grid.
   - **Horizontally Scrollable Team Section**: Added at the very bottom of the page, displaying cards for Abhishek Pandey, Shalini Verma, and Rohan Das, complete with professional photo representations, titles, and detailed operational/recruitment descriptions. Supports responsive horizontal swiping and overflow handling.
 - **Rebranded to MyJobSolution**: Swapped all remaining occurrences of "Call Me Job Solution" with "MyJobSolution" across the entire client-side app (headers, layout meta, registration modals, consent pages, footer components). This includes updating central contact points to `myjobsolution@gmail.com` and `@MyJobSolution`.
+- **Font & Style Unification (`font-open-sans`)**:
+  - Enforced `font-open-sans` font family globally across all tabs (`home`, `jobs`, `applied`, `register`, `about`, `contact`) to align with the *Browse Jobs* section.
+  - Replaced lower contrast grey text colors (`text-gray-900`, `text-gray-800`, `text-slate-800`, `text-slate-900`, `text-slate-605`) with high-contrast, premium `text-slate-950` or `text-slate-955` colors on all light background areas.
+  - Enhanced text color on dark-themed panels (like the Stats row and Hero/CTA text wrappers) to premium `text-emerald-100` and `text-slate-200` to maintain readability with correct contrast values.
+  - Verified compilation cleanliness using `bun run build`.
+
