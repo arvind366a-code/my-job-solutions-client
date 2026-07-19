@@ -90,10 +90,18 @@ export async function POST(request: Request) {
 
   const user = await currentUser();
   const contentType = request.headers.get("content-type") ?? "";
-  const body =
-    contentType.includes("multipart/form-data")
-      ? Object.fromEntries(await request.formData())
-      : await request.json();
+  let body: unknown;
+  let resumeFile: File | null = null;
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await request.formData();
+    const file = formData.get("resume");
+    if (file instanceof File && file.size > 0) {
+      resumeFile = file;
+    }
+    body = Object.fromEntries(formData);
+  } else {
+    body = await request.json();
+  }
   const parsed = profileSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -158,6 +166,43 @@ export async function POST(request: Request) {
       ? "Candidate updated their public profile."
       : "Candidate created their public profile.",
   });
+
+  if (resumeFile) {
+    const safeName = resumeFile.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+    const storagePath = `${result.data.id}/${Date.now()}-${safeName}`;
+    const { error: uploadError } = await supabase.storage
+      .from("candidate-documents")
+      .upload(storagePath, resumeFile, {
+        contentType: resumeFile.type || "application/octet-stream",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      return NextResponse.json({ error: uploadError.message }, { status: 500 });
+    }
+
+    const { error: documentError } = await supabase
+      .from("candidate_documents")
+      .insert({
+        candidate_id: result.data.id,
+        file_name: resumeFile.name,
+        file_type: resumeFile.type || "application/octet-stream",
+        file_size: resumeFile.size,
+        storage_path: storagePath,
+        uploaded_by_clerk_user_id: userId,
+      });
+
+    if (documentError) {
+      return NextResponse.json({ error: documentError.message }, { status: 500 });
+    }
+
+    await supabase.from("candidate_activity").insert({
+      candidate_id: result.data.id,
+      actor_clerk_user_id: userId,
+      activity_type: "document_uploaded",
+      body: `Uploaded ${resumeFile.name}.`,
+    });
+  }
 
   const resumeName = parsed.data.resumeName || (await getLatestResumeName(result.data.id));
   return NextResponse.json({

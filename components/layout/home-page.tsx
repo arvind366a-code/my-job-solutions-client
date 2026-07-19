@@ -324,10 +324,18 @@ function HomePageClient() {
     };
 
     try {
+      const formData = new FormData();
+      for (const [key, value] of Object.entries(regForm)) {
+        formData.append(key, value);
+      }
+      formData.append("resumeName", createdProfile.resumeName);
+      if (regFile) {
+        formData.append("resume", regFile);
+      }
+
       const response = await fetch("/api/profile", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(createdProfile),
+        body: formData,
       });
 
       if (!response.ok) {
