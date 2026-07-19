@@ -23,13 +23,15 @@ export function RegisterTab() {
           <div className="p-6 md:p-8 bg-white">
             <div className="flex flex-col items-center justify-center py-4">
               <SignIn
+                fallbackRedirectUrl="/dashboard"
+                signUpUrl="/sign-up"
                 appearance={{
                   variables: {
                     colorPrimary: "#0ca581",
                     colorBackground: "#ffffff",
-                    colorText: "#0f172a",
-                    colorInputBackground: "#ffffff",
-                    colorInputText: "#0f172a",
+                    colorForeground: "#0f172a",
+                    colorInput: "#ffffff",
+                    colorInputForeground: "#0f172a",
                     borderRadius: "0.75rem",
                     fontFamily: "'Open Sans', system-ui, sans-serif",
                   },

@@ -1,3 +1,4 @@
-ignoredBuiltDependencies:
-  - sharp
-  - unrs-resolver
+# Root-only project (not a multi-package monorepo).
+# Package manager settings live in package.json under "pnpm".
+packages:
+  - "."
